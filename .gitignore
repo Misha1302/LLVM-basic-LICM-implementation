@@ -1,0 +1,47 @@
+# CMake build directories
+/build/
+/cmake-build-*/
+/out/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+build.ninja
+rules.ninja
+.ninja_*
+compile_commands.json
+Testing/
+
+# Compiled files
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+
+# CLion / JetBrains
+.idea/
+
+# Local environment
+env.sh
+.env
+.env.*
+!.env.example
+
+# Temporary / backup files
+*.original-working
+*~
+*.swp
+*.swo
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+
+
+/tests/input.ll
