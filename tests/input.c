@@ -1,9 +1,14 @@
-int sum(int a, int b)
+int factorial(int a)
 {
-    return a + b;
+    int res = 1;
+    int sum = 0;
+    for (int i = 1; i <= a; i++)
+        res *= i;
+
+    return res;
 }
 
 int main(void)
 {
-    return sum(2, 3);
+    return factorial(10);
 }
