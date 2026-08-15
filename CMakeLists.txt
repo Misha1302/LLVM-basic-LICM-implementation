@@ -14,11 +14,11 @@ include(AddLLVM)
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
-add_llvm_pass_plugin(MyPass
-        src/MyPass.cpp
+add_llvm_pass_plugin(LicmOptimizationPass
+        src/LicmOptimizationPass.cpp
 )
 
-target_compile_features(MyPass PRIVATE cxx_std_17)
+target_compile_features(LicmOptimizationPass PRIVATE cxx_std_17)
 
 
 # input.c -> input.ll
@@ -67,23 +67,30 @@ find_program(
         REQUIRED
 )
 
+set(OUTPUT_LL
+        ${CMAKE_CURRENT_BINARY_DIR}/output.ll
+)
+
+
 add_custom_target(
         run-pass
 
         COMMAND
         ${OPT_EXECUTABLE}
-        -load-pass-plugin=$<TARGET_FILE:MyPass>
-        -passes=MyPass
-        -disable-output
+        -load-pass-plugin=$<TARGET_FILE:LicmOptimizationPass>
+        -passes=mem2reg,loop-simplify,LicmOptimizationPass
+        -verify-each
+        -S
         ${INPUT_LL}
+        -o ${OUTPUT_LL}
 
-        COMMENT "Running MyPass on input.ll"
+        COMMENT "Running LicmOptimizationPass on input.ll"
 
         VERBATIM
 )
 
 add_dependencies(
         run-pass
-        MyPass
+        LicmOptimizationPass
         generate-ir
 )
