@@ -39,7 +39,7 @@ jobs:
           cmake --build build --target LicmOptimizationPass -j2
           test -f build/LicmOptimizationPass.so
 
-      - name: Differential fuzz plain C
+      - name: Differential fuzz targeted plain C
         run: |
           set -euxo pipefail
           python3 tools/licm_diff_fuzz.py \
@@ -48,10 +48,25 @@ jobs:
             --plugin build/LicmOptimizationPass.so \
             --out fuzz-out
 
+      - name: Differential fuzz randomized plain C
+        run: |
+          set -euxo pipefail
+          python3 tools/licm_random_fuzz.py \
+            --clang clang-22 \
+            --opt opt-22 \
+            --plugin build/LicmOptimizationPass.so \
+            --out fuzz-random-out \
+            --seed 0xC0FFEE \
+            --integer-cases 1200 \
+            --pointer-cases 200 \
+            --float-cases 200
+
       - name: Upload corpus and IR evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: licm-differential-fuzz
-          path: fuzz-out
+          path: |
+            fuzz-out
+            fuzz-random-out
           if-no-files-found: warn
