@@ -44,6 +44,8 @@ add_custom_command(
         COMMAND
         ${CLANG_EXECUTABLE}
         -O0
+        -Xclang
+        -disable-O0-optnone
         -S
         -emit-llvm
         ${INPUT_C}

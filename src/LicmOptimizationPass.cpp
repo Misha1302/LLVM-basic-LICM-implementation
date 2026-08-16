@@ -4,25 +4,72 @@
 #include "llvm/Plugins/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/ValueTracking.h"
 
 using i64 = int64_t;
 
 using namespace llvm;
 
 namespace {
-    struct LicmOptimizationPass : PassInfoMixin<LicmOptimizationPass> {
-        static PreservedAnalyses run(Function &function, FunctionAnalysisManager &fam) {
-            LoopInfo &loopInfo = fam.getResult<LoopAnalysis>(function);
+    class LicmVerifier {
+    public:
+        bool can_be_moved_to_preheader(const Instruction &instruction, const Loop &loop) const {
+            if (instruction.isTerminator()) return false;
+            if (instruction.mayHaveSideEffects()) return false;
+            if (instruction.mayReadOrWriteMemory()) return false;
+            if (!isSafeToSpeculativelyExecute(&instruction)) return false;
+            if (isa<PHINode>(&instruction)) return false;
+            if (loop.getLoopPreheader() == nullptr) return false;
+            if (!loop.hasLoopInvariantOperands(&instruction)) return false;
 
-            for (Loop *loop : loopInfo) {
-                if (BasicBlock *header = loop->getHeader()) {
-                    errs() << "Loop header: "
-                           << header->getName()
-                           << '\n';
-                }
+            return true;
+        }
+    };
+
+    class LicmMover {
+    public:
+        void move_instruction_to_preheader(Loop &loop, Instruction &instruction) const {
+            auto &preheader = *loop.getLoopPreheader();
+            auto insert_it = preheader.getTerminator()->getIterator();
+            instruction.moveBefore(preheader, insert_it);
+            outs() << instruction.getOpcodeName() << "\n";
+        }
+    };
+
+    struct LicmOptimizationPass : PassInfoMixin<LicmOptimizationPass> {
+        static void optimize_loop(
+            const LoopInfo &loop_info,
+            Loop &loop,
+            const LicmVerifier &verifier,
+            const LicmMover &mover
+        ) {
+            for (const auto inner_loop: loop.getSubLoops()) {
+                optimize_loop(loop_info, *inner_loop, verifier, mover);
             }
 
-            return PreservedAnalyses::all();
+            for (const auto bb: loop.getBlocks()) {
+                if (loop_info.getLoopFor(bb) != &loop) {
+                    continue;
+                }
+
+                for (auto it = bb->begin(); it != bb->end();) {
+                    if (Instruction &instruction = *it++; verifier.can_be_moved_to_preheader(instruction, loop)) {
+                        mover.move_instruction_to_preheader(loop, instruction);
+                    }
+                }
+            }
+        }
+
+        static PreservedAnalyses run(Function &function, FunctionAnalysisManager &fam) {
+            const auto &loopInfo = fam.getResult<LoopAnalysis>(function);
+
+            for (const auto loop: loopInfo) {
+                constexpr LicmVerifier verifier;
+                constexpr LicmMover mover;
+                optimize_loop(loopInfo, *loop, verifier, mover);
+            }
+
+            return PreservedAnalyses::none();
         }
 
         static bool isRequired() {
