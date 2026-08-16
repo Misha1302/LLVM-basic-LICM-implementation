@@ -1,0 +1,57 @@
+name: LICM Csmith fuzz
+
+on:
+  push:
+    branches:
+      - analysis/licm-fuzz-20260817
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  csmith:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 22 and Csmith
+        run: |
+          set -euxo pipefail
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          sudo apt-get update
+          sudo apt-get install -y llvm-22 llvm-22-dev clang-22 csmith libcsmith-dev
+
+      - name: Build plugin
+        run: |
+          set -euxo pipefail
+          cmake -S . -B build \
+            -DLLVM_DIR="$(llvm-config-22 --cmakedir)" \
+            -DCMAKE_CXX_COMPILER=clang++-22 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target LicmOptimizationPass -j2
+
+      - name: Run 100 Csmith seeds
+        run: |
+          set -euxo pipefail
+          python3 tools/licm_csmith_fuzz.py \
+            --clang clang-22 \
+            --opt opt-22 \
+            --csmith csmith \
+            --csmith-include /usr/include/csmith \
+            --plugin build/LicmOptimizationPass.so \
+            --out csmith-out \
+            --first-seed 1 \
+            --count 100
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: licm-csmith-fuzz
+          path: csmith-out
+          if-no-files-found: warn
