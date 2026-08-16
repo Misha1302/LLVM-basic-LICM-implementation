@@ -51,7 +51,7 @@ jobs:
       - name: Differential fuzz randomized plain C
         run: |
           set -euxo pipefail
-          python3 tools/licm_random_fuzz.py \
+          python3 tools/licm_random_fuzz_v2.py \
             --clang clang-22 \
             --opt opt-22 \
             --plugin build/LicmOptimizationPass.so \
