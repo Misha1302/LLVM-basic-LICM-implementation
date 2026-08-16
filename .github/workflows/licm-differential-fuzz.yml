@@ -1,0 +1,57 @@
+name: LICM differential fuzz
+
+on:
+  push:
+    branches:
+      - analysis/licm-fuzz-20260817
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 22
+        run: |
+          set -euxo pipefail
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          sudo apt-get update
+          sudo apt-get install -y llvm-22 llvm-22-dev clang-22
+          clang-22 --version
+          opt-22 --version
+          llvm-config-22 --version
+
+      - name: Build current LICM plugin
+        run: |
+          set -euxo pipefail
+          cmake -S . -B build \
+            -DLLVM_DIR="$(llvm-config-22 --cmakedir)" \
+            -DCMAKE_CXX_COMPILER=clang++-22 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target LicmOptimizationPass -j2
+          test -f build/LicmOptimizationPass.so
+
+      - name: Differential fuzz plain C
+        run: |
+          set -euxo pipefail
+          python3 tools/licm_diff_fuzz.py \
+            --clang clang-22 \
+            --opt opt-22 \
+            --plugin build/LicmOptimizationPass.so \
+            --out fuzz-out
+
+      - name: Upload corpus and IR evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: licm-differential-fuzz
+          path: fuzz-out
+          if-no-files-found: warn
