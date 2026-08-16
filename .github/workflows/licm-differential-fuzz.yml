@@ -17,17 +17,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LLVM 22
+      - name: Install LLVM 22 and Csmith
         run: |
           set -euxo pipefail
           wget -q https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 22
           sudo apt-get update
-          sudo apt-get install -y llvm-22 llvm-22-dev clang-22
+          sudo apt-get install -y llvm-22 llvm-22-dev clang-22 csmith libcsmith-dev
           clang-22 --version
           opt-22 --version
           llvm-config-22 --version
+          csmith --version
 
       - name: Build current LICM plugin
         run: |
@@ -61,6 +62,19 @@ jobs:
             --pointer-cases 200 \
             --float-cases 200
 
+      - name: Differential fuzz Csmith C99 programs
+        run: |
+          set -euxo pipefail
+          python3 tools/licm_csmith_fuzz.py \
+            --clang clang-22 \
+            --opt opt-22 \
+            --csmith csmith \
+            --csmith-include /usr/include/csmith \
+            --plugin build/LicmOptimizationPass.so \
+            --out csmith-out \
+            --first-seed 1 \
+            --count 100
+
       - name: Upload corpus and IR evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,4 +83,5 @@ jobs:
           path: |
             fuzz-out
             fuzz-random-out
+            csmith-out
           if-no-files-found: warn
