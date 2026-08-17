@@ -10,8 +10,3 @@ int foo(int a, int b)
 
     return res;
 }
-
-int main(void)
-{
-    return foo(10, 2);
-}

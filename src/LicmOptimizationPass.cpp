@@ -17,10 +17,16 @@ namespace {
             if (instruction.isTerminator()) return false;
             if (instruction.mayHaveSideEffects()) return false;
             if (instruction.mayReadOrWriteMemory()) return false;
-            if (!isSafeToSpeculativelyExecute(&instruction)) return false;
             if (isa<PHINode>(&instruction)) return false;
             if (loop.getLoopPreheader() == nullptr) return false;
             if (!loop.hasLoopInvariantOperands(&instruction)) return false;
+            if (!isSafeToSpeculativelyExecute(
+                    &instruction,
+                    nullptr, nullptr,
+                    nullptr, nullptr,
+                    true, false)
+            )
+                return false;
 
             return true;
         }
@@ -32,7 +38,6 @@ namespace {
             auto &preheader = *loop.getLoopPreheader();
             auto insert_it = preheader.getTerminator()->getIterator();
             instruction.moveBefore(preheader, insert_it);
-            outs() << instruction.getOpcodeName() << "\n";
         }
     };
 
